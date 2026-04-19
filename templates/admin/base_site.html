@@ -1,0 +1,12 @@
+
+
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% block title %}VVJM Mahal Committee{% endblock %} 
+{% block extrahead %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/admin_custom.css' %}">
+{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">VVJM Mahal Committee</a></h1>
+{% endblock %}
