@@ -12,21 +12,43 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+import dj_database_url
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env file when present (local dev convenience; on the server, set real env vars).
+load_dotenv(BASE_DIR / '.env')
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+# ---------------------------------------------------------------------------
+# Core security — all sourced from environment variables.
+# Run:  python manage.py check --deploy   to verify production readiness.
+# ---------------------------------------------------------------------------
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-no-tn0r&&mfw@3icwsls)tt*!ud+3wq7)9s)@4(a@0%g5+5d#s'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-no-tn0r&&mfw@3icwsls)tt*!ud+3wq7)9s)@4(a@0%g5+5d#s',
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['vvjmpallicommitte.online', 'www.vvjmpallicommitte.online', '52.66.24.124', 'localhost', '127.0.0.1']
+_allowed = os.environ.get(
+    'ALLOWED_HOSTS',
+    'vvjmpallicommitte.online,www.vvjmpallicommitte.online,52.66.24.124,localhost,127.0.0.1',
+)
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
+
+# ---------------------------------------------------------------------------
+# HTTPS / cookie security — only activate when actually behind TLS.
+# ---------------------------------------------------------------------------
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # Application definition
@@ -44,6 +66,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # serves collected static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -74,14 +97,20 @@ WSGI_APPLICATION = 'pallikamitti.wsgi.application'
 
 
 # Database
+# Default: SQLite on the VPS disk (fine for low-concurrency admin use).
+# Override for Postgres: set DATABASE_URL=postgres://user:pass@host/dbname in env.
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+_db_url = os.environ.get('DATABASE_URL')
+if _db_url:
+    DATABASES = {'default': dj_database_url.config(default=_db_url, conn_max_age=600)}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
 
 
 # Password validation
@@ -116,11 +145,14 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
+# WhiteNoise serves these in production without a separate CDN.
+# Run:  python manage.py collectstatic   before starting gunicorn.
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 # Default primary key field type

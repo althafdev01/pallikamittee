@@ -1,0 +1,27 @@
+# /etc/systemd/system/pallikamitti.service
+# After editing: sudo systemctl daemon-reload && sudo systemctl restart pallikamitti
+
+[Unit]
+Description=Pallikamitti gunicorn daemon
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/pallikamittee/app
+
+# Load production secrets from this file on the server.
+EnvironmentFile=/home/ubuntu/pallikamittee/app/.env
+
+ExecStart=/home/ubuntu/pallikamittee/app/env/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:8000 \
+    --access-logfile /var/log/pallikamitti/access.log \
+    --error-logfile  /var/log/pallikamitti/error.log \
+    pallikamitti.wsgi:application
+
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
